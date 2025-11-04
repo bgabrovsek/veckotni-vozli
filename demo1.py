@@ -1,3 +1,4 @@
-from veckotni import Vozel
+from veckotni import nakljucen_vozel
 
-v = Vozel()
+v = nakljucen_vozel(10)
+v.prikazi()

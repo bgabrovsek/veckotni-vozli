@@ -26,10 +26,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-from typing import Optional
+from typing import List, Optional
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+from math import gcd
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
+from matplotlib.widgets import Slider
+from typing import List
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.animation import FuncAnimation, PillowWriter
+from typing import List
+
 
 
 class Vozel:
@@ -86,9 +102,12 @@ class Vozel:
         """
         rezultat = "Večkotni vozel "
         rezultat += f"\"{self.ime}\" " if self.ime else ""
-        rezultat += f"s {len(self.tocke)} oglišči:\n"
+        rezultat += opis_oglisca(len(self.tocke)) + "\n"
         rezultat += f"{self.tocke}"
         return rezultat
+
+    def __len__(self):
+        return len(self.tocke)
 
     def prikazi(self) -> None:
         """Prikaže vozel v 3D prostoru z oglišči in povezavami."""
@@ -116,7 +135,7 @@ class Vozel:
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_zlabel("z")
-        plt.legend()
+        #plt.legend()
         plt.show()
 
     def geogebra(self) -> None:
@@ -152,6 +171,51 @@ class Vozel:
                 for t in interval
             ]
         )
+
+    def kopija(self) -> "Vozel":
+        return Vozel(self.tocke.copy())
+
+
+    def zaporedje_redukcij(self) -> List["Vozel"]:
+        """
+        Izvede popolno redukcijo *na kopiji* in vrne seznam stanj vozla
+        po posameznih odstranitvah oglišč. Prvi element je začetno stanje,
+        zadnji pa končni (nerešljivo) stanje.
+        """
+        # delaj na kopiji, da ne spreminjamo self
+        curr = self.kopija()
+        zgodovina: List[Vozel] = [curr.kopija()]  # vključi začetno stanje
+
+        dolzina = len(curr.tocke)
+        if dolzina == 3:
+            return zgodovina
+
+        while True:
+            if dolzina == 4:
+                # identična posebna obravnava kot v tvoji reduciraj()
+                curr.tocke = curr.tocke[0:3]
+                dolzina -= 1
+                zgodovina.append(curr.kopija())
+                return zgodovina
+
+            for i in range(dolzina):
+                # p0, p1, p2 so zaporedne točke
+                p0 = curr.tocke[i % dolzina]
+                p1 = curr.tocke[(i + 1) % dolzina]
+                p2 = curr.tocke[(i + 2) % dolzina]
+
+                if lahko_odstranim_tocko(p0, p1, p2, curr.tocke, i):
+                    # odstrani sredinsko točko p1
+                    idx = (i + 1) % dolzina
+                    curr.tocke = np.delete(curr.tocke, idx, axis=0)
+                    dolzina -= 1
+                    # shrani posnetek po tej odstranitvi
+                    zgodovina.append(curr.kopija())
+                    # po vsaki odstranitvi začnemo novo iteracijo nad posodobljenim stanjem
+                    break
+            else:
+                # nič več ne moremo odstraniti
+                return zgodovina
 
     def reduciraj(self) -> int:
         """Popolnoma reducira večkotni vozel z odstranjevanjem odvečnih točk.
@@ -192,6 +256,27 @@ class Vozel:
                 # Ni več mogoče odstraniti nobene točke.
                 return odstranjenih
 
+def opis_oglisca(n: int) -> str:
+    # določimo obliko samostalnika
+    if n == 1:
+        beseda = "ogliščem"
+    elif n == 2:
+        beseda = "ogliščema"
+    else:
+        beseda = "oglišči"
+
+    # določimo predlog s/z
+    zadnja = n % 10
+    zadnji_dve = n % 100
+
+    if zadnji_dve in (10, 11, 12):
+        predlog = "z"
+    elif 3 <= zadnja <= 9:
+        predlog = "s"
+    else:
+        predlog = "z"
+
+    return f"{predlog} {n} {beseda}"
 
 
 
@@ -352,8 +437,16 @@ def lahko_odstranim_tocko(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray,
 
 
 
+def nakljucen_vozel(tock_zacetnih, decimalna_mesta=3):
+    """
+    Generira naključen vozel z "tock_zacetnih" točkami.
+    """
+    vertices = np.random.uniform(-5, 5, (tock_zacetnih, 3))
+    vertices = np.round(vertices, decimalna_mesta)
+    return Vozel(vertices)
 
-def reduciran_vozel(tock_zacetnih, tock_koncnih, decimalna_mesta=3):
+
+def poisci_reduciran_vozel(tock_zacetnih, tock_koncnih, decimalna_mesta=3):
     """
     Args:
         tock_zacetnih: Vozel s koliko točkami naj generiramo
@@ -374,9 +467,157 @@ def reduciran_vozel(tock_zacetnih, tock_koncnih, decimalna_mesta=3):
         K = Vozel(vertices)
         odst = K.reduciraj()
         odst_max = max(odst_max, odst)
-        print(odst_max, vozlov, odst) # Če želimo videti tudi "hitrost" delovanja funckije.
+        #print(odst_max, vozlov, odst) # Če želimo videti tudi "hitrost" delovanja funckije.
         if odst == tock_zacetnih - tock_koncnih:
-            print(K, vozlov, odst, odst_max)
-            K.visualize()
             return K
+
+
+def torusni_vozel(n:int, p:int, q:int, R:float=2.0, a:float=1.0):
+    """
+    Generira (p, q) torusni vozel.
+
+    r(φ) = R + a*cos(qφ)
+    x(φ) = r(φ)*cos(pφ)
+    y(φ) = r(φ)*sin(pφ)
+    z(φ) = -a*sin(qφ)
+
+    Vrne:
+        xyz : (n, 3) točke v prostoru
+    """
+    phi = np.linspace(0.0, 2*np.pi, n, endpoint=False)
+    r = R + a * np.cos(q*phi)
+    x = r * np.cos(p*phi)
+    y = r * np.sin(p*phi)
+    z = - a * np.sin(q*phi)
+
+    xyz = np.vstack([x, y, z]).T
+    return Vozel(xyz)
+
+
+# ANIMACIJA
+
+# ----- Pomožna funkcija za risanje enega vozla na obstoječ ax -----
+def _narisi_vozel(ax: plt.Axes, tocke: np.ndarray) -> None:
+    """Na dano 3D os nariše vozel (oglišča + povezave)."""
+    ax.cla()
+    ax.set_xlabel("x"); ax.set_ylabel("y"); ax.set_zlabel("z")
+
+    x, y, z = tocke[:, 0], tocke[:, 1], tocke[:, 2]
+    ax.scatter(x, y, z, s=50, label="Oglišča")
+
+    n = len(tocke)
+    barva_map = cm.viridis
+
+    # Povezave med zaporednimi oglišči
+    for i in range(n - 1):
+        xi, yi, zi = tocke[i]
+        xj, yj, zj = tocke[i + 1]
+        ax.plot([xi, xj], [yi, yj], [zi, zj],
+                color=barva_map(i / max(1, n - 1)), linewidth=2)
+
+    # Zapri poligon
+    if n >= 2:
+        xi, yi, zi = tocke[0]
+        xj, yj, zj = tocke[-1]
+        ax.plot([xi, xj], [yi, yj], [zi, zj],
+                color=barva_map(1), linewidth=2)
+
+    if n:
+        max_range = max(np.ptp(x) or 1, np.ptp(y) or 1, np.ptp(z) or 1)
+        cx, cy, cz = np.mean(x), np.mean(y), np.mean(z)
+        r = max_range * 0.6
+        ax.set_xlim(cx - r, cx + r)
+        ax.set_ylim(cy - r, cy + r)
+        ax.set_zlim(cz - r, cz + r)
+
+    #ax.legend(loc="upper right")
+
+
+def shrani_video_redukcije(koraki: List["Vozel"], pot: str = "redukcija.gif",
+                            fps: int = 2, zadnjih_frejmov: int = 10,
+                            dpi: int = 120) -> str:
+    """
+    Ustvari GIF animacijo sekvence redukcij vozla in jo shrani na disk.
+    Zadnji vozel je prikazan večkrat (privzeto 10x), da se animacija ustavi.
+
+    Args:
+        koraki: seznam objektov Vozel.
+        pot: pot do izhodne .gif datoteke.
+        fps: število sličic na sekundo.
+        zadnjih_frejmov: koliko krat se ponovi zadnji vozel.
+        dpi: ločljivost izhoda.
+
+    Returns:
+        Pot do ustvarjene GIF datoteke.
+    """
+    if not koraki:
+        raise ValueError("Seznam 'koraki' je prazen.")
+
+    if not pot.lower().endswith(".gif"):
+        pot += ".gif"
+
+    # Dodaj zadnjih_frejmov kopij zadnjega stanja
+    razsirjeni_koraki = koraki + [koraki[-1]] * (zadnjih_frejmov - 1)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    def update(frame):
+        v = razsirjeni_koraki[frame]
+        _narisi_vozel(ax, v.tocke)
+        ax.set_title(f"Korak {min(frame, len(koraki)-1)} / {len(koraki)-1} (|V| = {len(v.tocke)})")
+        return fig,
+
+    anim = FuncAnimation(fig, update, frames=len(razsirjeni_koraki), blit=False)
+    writer = PillowWriter(fps=fps)
+    anim.save(pot, writer=writer, dpi=dpi)
+
+    plt.close(fig)
+    return os.path.abspath(pot)
+
+# ----- 2) Interaktivni prikaz z drsnikom -----
+
+def prikazi_redukcijo(koraki: List["Vozel"]) -> None:
+    """
+    Prikaže interaktivno okno z Matplotlib, ki omogoča premikanje po
+    sekvenci redukcij z drsnikom.
+    """
+    if not koraki:
+        raise ValueError("Seznam 'koraki' je prazen.")
+
+    # Postavitev: prostor za 3D graf + drsnik spodaj
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    plt.subplots_adjust(bottom=0.18)  # prostor za drsnik
+
+    # Začetno stanje
+    _narisi_vozel(ax, koraki[0].tocke)
+    ax.set_title(f"Korak 0 / {len(koraki)-1} (|V| = {len(koraki[0].tocke)})")
+
+    # Os za drsnik
+    ax_slider = plt.axes([0.15, 0.06, 0.7, 0.05])  # [left, bottom, width, height]
+    slider = Slider(ax=ax_slider, label='Korak', valmin=0, valmax=len(koraki)-1,
+                    valinit=0, valstep=1)
+
+    # Callback za posodobitev prikaza
+    def on_change(val):
+        idx = int(slider.val)
+        v = koraki[idx]
+        _narisi_vozel(ax, v.tocke)
+        ax.set_title(f"Korak {idx} / {len(koraki)-1} (|V| = {len(v.tocke)})")
+        fig.canvas.draw_idle()
+
+    slider.on_changed(on_change)
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    t = torusni_vozel(29, 3, 2)
+    print("Vozel ima", len(t), "točk")
+
+    zaporedje = t.zaporedje_redukcij()
+
+    #prikazi_redukcijo(zaporedje)
+    shrani_video_redukcije(zaporedje, "redukcija.gif", fps=1)
 
