@@ -26,6 +26,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+from typing import Optional
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+
 
 class Vozel:
     """Večkotni (poligonalni) vozel podan z zaporedjem točk v 3D prostoru.
@@ -34,41 +39,43 @@ class Vozel:
     Zaporedne točke so povezane z daljicami, zadnja točka pa je povezana s prvo.
 
     Atributi:
-        vertices (np.ndarray): Tabela oblike (N, 3), kjer vsaka vrstica
+        tocke (np.ndarray): Tabela oblike (N, 3), kjer vsaka vrstica
             predstavlja oglišče z koordinatami (x, y, z).
-        name (Optional[str]): Poljubno ime vozla.
+        ime (Optional[str]): Poljubno ime vozla.
 
     Izjeme:
         ValueError: Če vhodne točke niso oblike (N, 3), če zaporedna trojica
             točk vsebuje kolinearne točke ali če ima vozel samopresečišča.
     """
 
-    def __init__(self, vertices, name: Optional[str] = None):
+    def __init__(self, tocke, ime: Optional[str] = None):
         """Inicializira večkotni vozel.
 
         Args:
-            vertices: Poljubna struktura, ki jo je mogoče pretvoriti v
+            tocke: Poljubna struktura, ki jo je mogoče pretvoriti v
                 `np.ndarray` oblike (N, 3) z oglišči vozla.
-            name: Ime vozla (neobvezno).
+            ime: Ime vozla (neobvezno).
         """
-        vertices = np.array(vertices)  # Pretvorba v NumPy tabelo
-        self.vertices: np.ndarray = np.array(vertices)
-        self.name: Optional[str] = name
+        tocke = np.array(tocke)  # Pretvorba v NumPy tabelo
+        self.tocke: np.ndarray = np.array(tocke)
+        self.ime: Optional[str] = ime
 
         # Preverjanje oblike podatkov
-        if len(self.vertices.shape) != 2 or self.vertices.shape[1] != 3:
-            raise ValueError("Oglišča morajo biti v tabeli oblike (N, 3).")
+        if len(self.tocke.shape) != 2 or self.tocke.shape[1] != 3:
+            raise ValueError("Točke morajo biti v tabeli oblike (N, 3).")
 
         # Preverjanje, da nobene tri zaporedne točke niso kolinearne
-        ext = np.concatenate((vertices, vertices[:2]), axis=0)
+        ext = np.concatenate((self.tocke, self.tocke[:2]), axis=0)
         for a, b, c in zip(ext, ext[1:], ext[2:]):
             u, v = c - b, b - a
-            rez = np.cross(u, v)
-            if not np.all(rez):
+            križ = np.cross(u, v)
+            # če je vektor križa (približno) ničeln, so točke kolinearne
+            if np.allclose(križ, 0):
                 raise ValueError(f"Točke {a}, {b}, {c} so kolinearne.")
 
         # Preverjanje samopresečišč
-        if not ima_samopresecisca(vertices):
+        # pričakujemo funkcijo `ima_samopresecisca(tocke)` (vrne True, če NI samopresečišč)
+        if not ima_samopresecisca(self.tocke):
             raise ValueError("Vozel ima samopresečišča.")
 
     def __repr__(self) -> str:
@@ -78,33 +85,33 @@ class Vozel:
             str: Formatiran niz z imenom (če je dano) in številom oglišč.
         """
         rezultat = "Večkotni vozel "
-        rezultat += f"\"{self.name}\" " if self.name else ""
-        rezultat += f"s {len(self.vertices)} oglišči:\n"
-        rezultat += f"{self.vertices}"
+        rezultat += f"\"{self.ime}\" " if self.ime else ""
+        rezultat += f"s {len(self.tocke)} oglišči:\n"
+        rezultat += f"{self.tocke}"
         return rezultat
 
-    def visualize(self) -> None:
+    def prikazi(self) -> None:
         """Prikaže vozel v 3D prostoru z oglišči in povezavami."""
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
-        x, y, z = self.vertices[:, 0], self.vertices[:, 1], self.vertices[:, 2]
-        ax.scatter(x, y, z, color='blue', s=50, label="Oglišča")
+        x, y, z = self.tocke[:, 0], self.tocke[:, 1], self.tocke[:, 2]
+        ax.scatter(x, y, z, s=50, label="Oglišča")
 
-        color_map = plt.cm.viridis
-        n = len(self.vertices)
+        barva_map = plt.cm.viridis
+        n = len(self.tocke)
 
         # Povezave med zaporednimi oglišči
         for i in range(n - 1):
-            xi, yi, zi = self.vertices[i]
-            xj, yj, zj = self.vertices[i + 1]
-            color = color_map(i / (n - 1))
-            ax.plot([xi, xj], [yi, yj], [zi, zj], color=color, linewidth=2)
+            xi, yi, zi = self.tocke[i]
+            xj, yj, zj = self.tocke[i + 1]
+            barva = barva_map(i / (n - 1))
+            ax.plot([xi, xj], [yi, yj], [zi, zj], color=barva, linewidth=2)
 
         # Zapremo poligon: zadnja -> prva
-        xi, yi, zi = self.vertices[0]
-        xj, yj, zj = self.vertices[-1]
-        ax.plot([xi, xj], [yi, yj], [zi, zj], color=color_map(1), linewidth=2)
+        xi, yi, zi = self.tocke[0]
+        xj, yj, zj = self.tocke[-1]
+        ax.plot([xi, xj], [yi, yj], [zi, zj], color=barva_map(1), linewidth=2)
 
         ax.set_xlabel("x")
         ax.set_ylabel("y")
@@ -114,28 +121,28 @@ class Vozel:
 
     def geogebra(self) -> None:
         """Izpiše niza ukazov za GeoGebro, ki izrišeta vozel kot zaporedje daljic."""
-        tocke_niz = "Točke={"
-        tocke_niz += ", ".join([f"({t[0]}, {t[1]}, {t[2]})" for t in self.vertices])
-        tocke_niz += f", ({self.vertices[0][0]}, {self.vertices[0][1]}, {self.vertices[0][2]})}}"
+        tocke_niz = "Tocke={"
+        tocke_niz += ", ".join([f"({t[0]}, {t[1]}, {t[2]})" for t in self.tocke])
+        tocke_niz += f", ({self.tocke[0][0]}, {self.tocke[0][1]}, {self.tocke[0][2]})}}"
 
-        daljice_niz = "Zaporedje(Daljica(Element(Točke,i),Element(Točke,i+1)),i,1,Dolžina(Točke)-1)"
+        daljice_niz = "Zaporedje(Daljica(Element(Tocke,i),Element(Tocke,i+1)),i,1,Dolzina(Tocke)-1)"
 
         print("Prvi niz:", tocke_niz)
         print("Drugi niz:", daljice_niz)
 
-    def approx_torus_knot(self, p: int, q: int, vertices: int = 50) -> None:
-        """Aproksimira torusni vozel kot večkotni vozel in zamenja trenutna oglišča.
+    def aproksimiraj_torusni_vozel(self, p: int, q: int, stevilo_tock: int = 50) -> None:
+        """Aproksimira torusni vozel kot večkotni vozel in zamenja trenutne točke.
 
-        Opomba: Metoda ohrani obstoječe ime vozla, vendar oglišča
+        Opomba: Metoda ohrani obstoječe ime vozla, vendar točke
         zamenja z vzorčenimi točkami torusnega vozla.
 
         Args:
             p (int): Parameter torusnega vozla (skupaj z `q` naj bosta tuji).
             q (int): Parameter torusnega vozla (skupaj z `p` naj bosta tuji).
-            vertices (int): Število oglišč aproksimacije.
+            stevilo_tock (int): Število točk aproksimacije.
         """
-        interval = np.linspace(0, 2 * math.pi, vertices, endpoint=False)
-        self.vertices = np.array(
+        interval = np.linspace(0, 2 * math.pi, stevilo_tock, endpoint=False)
+        self.tocke = np.array(
             [
                 [
                     (math.cos(t * q) + 2) * math.cos(p * t),
@@ -147,43 +154,44 @@ class Vozel:
         )
 
     def reduciraj(self) -> int:
-        """Popolnoma reducira večkotni vozel z odstranjevanjem odvečnih oglišč.
+        """Popolnoma reducira večkotni vozel z odstranjevanjem odvečnih točk.
 
         Algoritem iterativno preverja trojke zaporednih točk in,
-        kadar je to dovoljeno (podano z `lahko_odstranim_ogljisce`),
-        odstrani sredinsko oglišče. Postopek se konča, ko ni več
+        kadar je to dovoljeno (podano z `lahko_odstranim_tocko`),
+        odstrani sredinsko točko. Postopek se konča, ko ni več
         mogoče odstraniti nobene točke.
 
         Returns:
-            int: Število odstranjenih oglišč.
+            int: Število odstranjenih točk.
         """
         odstranjenih = 0
-        dolzina = len(self.vertices)
+        dolzina = len(self.tocke)
 
         if dolzina == 3:
             return 0
 
         while True:
             if dolzina == 4:
-                self.vertices = self.vertices[0:3]
+                self.tocke = self.tocke[0:3]
                 return odstranjenih + 1
 
             for i in range(dolzina):
-                # p0, p1, p2 so oglišča trikotnika; preverjamo, ali lahko izločimo p1.
-                p0 = self.vertices[i % dolzina]
-                p1 = self.vertices[(i + 1) % dolzina]
-                p2 = self.vertices[(i + 2) % dolzina]
+                # p0, p1, p2 so točke trikotnika; preverjamo, ali lahko izločimo p1.
+                p0 = self.tocke[i % dolzina]
+                p1 = self.tocke[(i + 1) % dolzina]
+                p2 = self.tocke[(i + 2) % dolzina]
 
-                # Če ni težav, odstranimo sredinsko oglišče.
-                if lahko_odstranim_tocko(p0, p1, p2, self.vertices, i):
-                    self.vertices = np.delete(self.vertices, (i + 1) % dolzina, 0)
+                # Če ni težav, odstranimo sredinsko točko.
+                if lahko_odstranim_tocko(p0, p1, p2, self.tocke, i):
+                    self.tocke = np.delete(self.tocke, (i + 1) % dolzina, 0)
                     dolzina -= 1
                     odstranjenih += 1
                     # Po vsaki odstranitvi ponovno preverimo posodobljen vozel.
                     break
             else:
-                # Ni več mogoče odstraniti nobenega oglišča.
+                # Ni več mogoče odstraniti nobene točke.
                 return odstranjenih
+
 
 
 
@@ -341,3 +349,34 @@ def lahko_odstranim_tocko(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray,
                 return False
 
     return True
+
+
+
+
+def reduciran_vozel(tock_zacetnih, tock_koncnih, decimalna_mesta=3):
+    """
+    Args:
+        tock_zacetnih: Vozel s koliko točkami naj generiramo
+        tock_koncnih: Koliko točk naj ostane.
+        decimalna_mesta: Količino decimalnih mest v posamezni koordinati točke.
+
+    Returns: Zreduciran vozel z "tock_koncnih" točk.
+
+    Funkcija generira vozle z "tock" točk, dokler ne najde vozla, ki ga lahko zreducira na "tock_koncnih" točk.
+    Primerna za iskanje vozlov z določenim številom ogljišč in ugotavljanje, če metoda reduciraj ustrezno deluje (tock_koncnih=5).
+    """
+    vozlov = 0
+    odst_max = 0
+    while True:
+        vozlov += 1 #števec vozlov
+        vertices = np.random.uniform(-5, 5, (tock_zacetnih, 3))
+        vertices = np.round(vertices, decimalna_mesta)
+        K = Vozel(vertices)
+        odst = K.reduciraj()
+        odst_max = max(odst_max, odst)
+        print(odst_max, vozlov, odst) # Če želimo videti tudi "hitrost" delovanja funckije.
+        if odst == tock_zacetnih - tock_koncnih:
+            print(K, vozlov, odst, odst_max)
+            K.visualize()
+            return K
+
