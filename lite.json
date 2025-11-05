@@ -5,5 +5,8 @@
   "appUrls": {
     "lab": "./lab/index.html",
     "retro": "./retro/notebooks/index.html"
-  }
+  },
+   "federated_extensions": [
+    "@jupyter-widgets/jupyterlab-manager"
+  ]
 }
