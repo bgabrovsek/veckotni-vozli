@@ -19,32 +19,14 @@ Različica: 1.0
 
 from __future__ import annotations
 
-import math
-from typing import Optional
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-
-from typing import List, Optional
-import numpy as np
-import math
-import matplotlib.pyplot as plt
-from math import gcd
-
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.animation import FuncAnimation, FFMpegWriter, PillowWriter
-from matplotlib.widgets import Slider
-from typing import List
-
 import os
 import numpy as np
+from matplotlib.widgets import Slider
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.animation import FuncAnimation, PillowWriter
-from typing import List
+import math
+from typing import List, Optional
 
 
 
