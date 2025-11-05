@@ -3,6 +3,9 @@ Knjižnica za večkotne vozle
 
 Knjižnica za večkotne (poligonalne) vozle v tridimenzionalnem prostoru.
 
+Domonstracija knjižnice je na voljo na povezavi
+https://bgabrovsek.github.io/veckotni-vozli/lab/index.html
+
 ------------------------------------------------------------
 
 Opis
