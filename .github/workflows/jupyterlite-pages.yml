@@ -42,6 +42,7 @@ jobs:
         run: |
           jupyter lite build \
             --contents notebooks \
+            --contents veckotni \
             --output-dir dist
 
       - name: Upload Pages artifact
