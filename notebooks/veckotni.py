@@ -28,30 +28,6 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 import math
 from typing import List, Optional
 
-import sys
-
-def _ensure_pkg(mod_name, pip_name=None):
-    try:
-        return __import__(mod_name)
-    except ModuleNotFoundError:
-        # In JupyterLite, use micropip to load the Pyodide wheel
-        if "pyodide" in sys.modules:
-            import asyncio
-            import micropip
-            # default pip_name to module name (e.g., numpy -> "numpy")
-            pkg = pip_name or mod_name
-            # Install then import
-            async def _install():
-                await micropip.install(pkg)
-            asyncio.get_event_loop().run_until_complete(_install())
-            return __import__(mod_name)
-        # Outside JupyterLite, propagate the error
-        raise
-
-# Use the helper to guarantee imports
-np = _ensure_pkg("numpy")
-plt = _ensure_pkg("matplotlib.pyplot", "matplotlib")
-
 class Vozel:
     """Večkotni (poligonalni) vozel podan z zaporedjem točk v 3D prostoru.
 
